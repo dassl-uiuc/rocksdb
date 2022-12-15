@@ -145,6 +145,9 @@ struct EnvOptions {
 
   // If not nullptr, write rate limiting is enabled for flush and compaction
   RateLimiter* rate_limiter = nullptr;
+
+  // If true, then this file will be replicated by compute-side-log library
+  bool use_comp_side_log = false;
 };
 
 // Exceptions MUST NOT propagate out of overridden functions into RocksDB,

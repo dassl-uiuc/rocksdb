@@ -9,6 +9,7 @@
 
 #if !defined(OS_WIN)
 
+#include <csl.h>
 #include <dirent.h>
 #ifndef ROCKSDB_NO_DYNAMIC_EXTENSION
 #include <dlfcn.h>
@@ -317,6 +318,10 @@ class PosixFileSystem : public FileSystem {
     }
 
     flags = cloexec_flags(flags, &options);
+
+    if (options.use_comp_side_log) {
+      flags |= O_CSL;
+    }
 
     do {
       IOSTATS_TIMER_GUARD(open_nanos);
@@ -919,6 +924,7 @@ class PosixFileSystem : public FileSystem {
     FileOptions optimized = file_options;
     optimized.use_mmap_writes = false;
     optimized.use_direct_writes = false;
+    optimized.use_comp_side_log = true;
     optimized.bytes_per_sync = db_options.wal_bytes_per_sync;
     // TODO(icanadi) it's faster if fallocate_with_keep_size is false, but it
     // breaks TransactionLogIteratorStallAtLastRecord unit test. Fix the unit

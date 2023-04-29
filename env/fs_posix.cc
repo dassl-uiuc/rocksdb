@@ -179,6 +179,10 @@ class PosixFileSystem : public FileSystem {
 #endif
     }
 
+    if (options.use_comp_side_log) {
+      flags |= O_CSL;
+    }
+
     do {
       IOSTATS_TIMER_GUARD(open_nanos);
       fd = open(fname.c_str(), flags, GetDBFileMode(allow_non_owner_access_));

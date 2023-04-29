@@ -7,6 +7,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file. See the AUTHORS file for names of contributors.
 #include <cinttypes>
+#include <chrono>
 
 #include "db/builder.h"
 #include "db/db_impl/db_impl.h"
@@ -958,6 +959,7 @@ Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& wal_numbers,
                                SequenceNumber* next_sequence, bool read_only,
                                bool* corrupted_wal_found,
                                RecoveryContext* recovery_ctx) {
+  auto start = std::chrono::high_resolution_clock::now();
   struct LogReporter : public log::Reader::Reporter {
     Env* env;
     Logger* info_log;
@@ -1046,6 +1048,7 @@ Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& wal_numbers,
       status = fs_->NewSequentialFile(fname,
                                       fs_->OptimizeForLogRead(file_options_),
                                       &file, nullptr);
+      // printf("%s\n", status.ToString().c_str());
       if (!status.ok()) {
         MaybeIgnoreError(&status);
         if (!status.ok()) {
@@ -1088,6 +1091,7 @@ Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& wal_numbers,
     TEST_SYNC_POINT_CALLBACK("DBImpl::RecoverLogFiles:BeforeReadWal",
                              /*arg=*/nullptr);
     uint64_t record_checksum;
+    // printf("P1 %s\n", status.ToString().c_str());
     while (!stop_replay_by_wal_filter &&
            reader.ReadRecord(&record, &scratch,
                              immutable_db_options_.wal_recovery_mode,
@@ -1098,6 +1102,8 @@ Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& wal_numbers,
                             Status::Corruption("log record too small"));
         continue;
       }
+
+      // printf("P10 %s\n", status.ToString().c_str());
 
       // We create a new batch and initialize with a valid prot_info_ to store
       // the data checksums
@@ -1117,6 +1123,8 @@ Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& wal_numbers,
       if (!status.ok()) {
         return status;
       }
+
+      // printf("P11 %s\n", status.ToString().c_str());
 
       SequenceNumber sequence = WriteBatchInternal::Sequence(&batch);
 
@@ -1143,6 +1151,8 @@ Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& wal_numbers,
         continue;
       }
 
+      // printf("P12 %s\n", status.ToString().c_str());
+
       // If column family was not found, it might mean that the WAL write
       // batch references to the column family that was dropped after the
       // insert. We don't want to fail the whole write batch in that case --
@@ -1155,6 +1165,7 @@ Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& wal_numbers,
           false /* concurrent_memtable_writes */, next_sequence,
           &has_valid_writes, seq_per_batch_, batch_per_txn_);
       MaybeIgnoreError(&status);
+      // printf("P13 %s\n", status.ToString().c_str());
       if (!status.ok()) {
         // We are treating this as a failure while reading since we read valid
         // blocks that do not form coherent data
@@ -1162,7 +1173,10 @@ Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& wal_numbers,
         continue;
       }
 
+      // printf("P14 %s\n", status.ToString().c_str());
+
       if (has_valid_writes && !read_only) {
+        // printf("P15 %s\n", status.ToString().c_str());
         // we can do this because this is called before client has access to the
         // DB and there is only a single thread operating on DB
         ColumnFamilyData* cfd;
@@ -1188,7 +1202,7 @@ Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& wal_numbers,
         }
       }
     }
-
+    // printf("P2 %s\n", status.ToString().c_str());
     if (!status.ok()) {
       if (status.IsNotSupported()) {
         // We should not treat NotSupported as corruption. It is rather a clear
@@ -1231,7 +1245,7 @@ Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& wal_numbers,
         return status;
       }
     }
-
+    // printf("P3\n");
     flush_scheduler_.Clear();
     trim_history_scheduler_.Clear();
     auto last_sequence = *next_sequence - 1;
@@ -1282,6 +1296,7 @@ Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& wal_numbers,
       }
     }
   }
+  // printf("P3 %s\n", status.ToString().c_str());
 
   // True if there's any data in the WALs; if not, we can skip re-processing
   // them later
@@ -1291,6 +1306,7 @@ Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& wal_numbers,
     // to the DB and can not drop column families while we iterate
     const WalNumber max_wal_number = wal_numbers.back();
     for (auto cfd : *versions_->GetColumnFamilySet()) {
+      // printf("P30 %s\n", status.ToString().c_str());
       auto iter = version_edits.find(cfd->GetID());
       assert(iter != version_edits.end());
       VersionEdit* edit = &iter->second;
@@ -1339,6 +1355,7 @@ Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& wal_numbers,
         edit->SetLogNumber(max_wal_number + 1);
       }
     }
+    // printf("P31 %s\n", status.ToString().c_str());
     if (status.ok()) {
       // we must mark the next log number as used, even though it's
       // not actually used. that is because VersionSet assumes
@@ -1369,7 +1386,7 @@ Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& wal_numbers,
       }
     }
   }
-
+  // printf("P4 %s\n", status.ToString().c_str());
   if (status.ok()) {
     if (data_seen && !flushed) {
       status = RestoreAliveLogFiles(wal_numbers);
@@ -1386,6 +1403,9 @@ Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& wal_numbers,
   event_logger_.Log() << "job" << job_id << "event"
                       << "recovery_finished";
 
+  auto end = std::chrono::high_resolution_clock::now();
+  auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+  printf("end recovery, time %ld\n", duration);
   return status;
 }
 

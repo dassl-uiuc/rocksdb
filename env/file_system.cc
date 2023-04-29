@@ -139,6 +139,7 @@ FileOptions FileSystem::OptimizeForLogRead(
               const FileOptions& file_options) const {
   FileOptions optimized_file_options(file_options);
   optimized_file_options.use_direct_reads = false;
+  optimized_file_options.use_comp_side_log = true;
   return optimized_file_options;
 }
 

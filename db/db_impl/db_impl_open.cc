@@ -1064,6 +1064,10 @@ Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& wal_numbers,
           io_tracer_));
     }
 
+    auto end = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+    printf("after open %ldus\n", duration);
+
     // Create the log reader.
     LogReporter reporter;
     reporter.env = env_;

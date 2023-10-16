@@ -1066,7 +1066,7 @@ Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& wal_numbers,
 
     auto end = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
-    printf("after open %ldus\n", duration);
+    printf("after open %ld us\n", duration);
 
     // Create the log reader.
     LogReporter reporter;
